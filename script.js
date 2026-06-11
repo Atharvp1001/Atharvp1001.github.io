@@ -1,6 +1,7 @@
 const canvas = document.querySelector("#hero-canvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas ? canvas.getContext("2d") : null;
 const year = document.querySelector("#year");
+const resumeLinks = document.querySelectorAll(".resume-link");
 
 if (year) {
   year.textContent = new Date().getFullYear();
@@ -22,6 +23,42 @@ const clouds = [
   { x: 0.45, y: 0.1, speed: 0.00008, scale: 0.9 },
   { x: 0.78, y: 0.2, speed: 0.0001, scale: 1.25 },
 ];
+
+async function canOpenPdf(pdfUrl) {
+  try {
+    const response = await fetch(pdfUrl, {
+      cache: "no-store",
+      headers: { Range: "bytes=0-7" },
+    });
+
+    if (!response.ok) return false;
+
+    const header = await response.text();
+    return header.startsWith("%PDF-");
+  } catch {
+    return false;
+  }
+}
+
+resumeLinks.forEach((link) => {
+  link.addEventListener("click", async (event) => {
+    if (window.location.protocol === "file:") return;
+
+    event.preventDefault();
+
+    const pdfUrl = new URL(link.getAttribute("href"), window.location.href);
+    const fallbackUrl = new URL(link.dataset.resumeFallback || "resume.html", window.location.href);
+    const opensInNewTab = link.target === "_blank";
+    const destinationWindow = opensInNewTab ? window.open("about:blank", "_blank") : window;
+    if (destinationWindow && destinationWindow !== window) {
+      destinationWindow.opener = null;
+    }
+    const target = destinationWindow || window;
+    const destinationUrl = (await canOpenPdf(pdfUrl)) ? pdfUrl : fallbackUrl;
+
+    target.location.href = destinationUrl.href;
+  });
+});
 
 function resizeCanvas() {
   const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -165,11 +202,13 @@ function animate(time = 0) {
   requestAnimationFrame(animate);
 }
 
-window.addEventListener("resize", resizeCanvas);
-window.addEventListener("pointermove", (event) => {
-  pointer.x = event.clientX / window.innerWidth;
-  pointer.y = event.clientY / window.innerHeight;
-});
+if (canvas && ctx) {
+  window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("pointermove", (event) => {
+    pointer.x = event.clientX / window.innerWidth;
+    pointer.y = event.clientY / window.innerHeight;
+  });
 
-resizeCanvas();
-animate();
+  resizeCanvas();
+  animate();
+}
